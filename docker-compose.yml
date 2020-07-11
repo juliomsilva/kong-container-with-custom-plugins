@@ -1,0 +1,54 @@
+version: "3.7"
+
+volumes:
+  kong_data:
+
+networks:
+  any_net:
+
+services:
+  kong:
+    image: kong:1.5.1-any
+    container_name: kong
+    build:
+      context: .
+    user: ${KONG_USER:-root}
+    networks:
+      - any_net
+    ports:
+      - "8000:8000/tcp"
+      - "8001:8001/tcp"
+    environment:
+      KONG_PG_DATABASE: ${KONG_PG_DATABASE:-kong}
+      KONG_PG_HOST: ${KONG_PG_HOST:-kong_database}
+      KONG_PG_PORT: ${KONG_PG_PORT:-5432}
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD:-kong}
+      KONG_PG_USER: ${KONG_PG_USER:-kong}
+      KONG_LOG_LEVEL: ${KONG_LOG_LEVEL:-info}
+    depends_on:
+      - kong_database
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kong_database:
+    image: postgres:11.7-alpine
+    container_name: kong_database
+    expose:
+      - 5432
+    networks:
+      - any_net
+    volumes:
+      - ./kong_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${KONG_PG_DATABASE:-kong}
+      POSTGRES_PASSWORD: ${KONG_PG_PASSWORD:-kong}
+      POSTGRES_USER: ${KONG_PG_USER:-kong}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${KONG_PG_USER:-kong}"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
